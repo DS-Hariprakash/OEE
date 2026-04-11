@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PEPS OEE Monitor</title>
+<style>
+:root {
+  --blue-50:#E6F1FB;--blue-100:#B5D4F4;--blue-200:#85B7EB;--blue-400:#378ADD;--blue-600:#185FA5;--blue-800:#0C447C;--blue-900:#042C53;
+  --teal-50:#E1F5EE;--teal-400:#1D9E75;--teal-600:#0F6E56;
+  --amber-50:#FAEEDA;--amber-400:#BA7517;--amber-600:#854F0B;
+  --green-50:#EAF3DE;--green-400:#639922;--green-600:#3B6D11;
+  --red-50:#FCEBEB;--red-400:#E24B4A;--red-600:#A32D2D;
+  --purple-50:#EEEDFE;--purple-400:#7F77DD;--purple-600:#534AB7;
+  --bg:#ffffff;--bg2:#f5f4f0;--bg3:#eeedea;
+  --border:rgba(0,0,0,0.11);--border2:rgba(0,0,0,0.18);
+  --text:#1a1a18;--text2:#6b6a65;--text3:#9c9a92;
+  --font:system-ui,-apple-system,sans-serif;
+  --radius:8px;--radius-lg:12px;
+}
+@media(prefers-color-scheme:dark){
+  :root{--bg:#1c1c1a;--bg2:#252523;--bg3:#2e2e2b;--border:rgba(255,255,255,0.1);--border2:rgba(255,255,255,0.18);--text:#e8e6de;--text2:#9c9a92;--text3:#6b6a65;--blue-50:#0d2540;--blue-900:#cde0f7;--amber-50:#2a1f08;--green-50:#0f1f06;--red-50:#250f0f;--purple-50:#160f40;--teal-50:#061f16;}
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font);font-size:14px;color:var(--text);background:var(--bg);}
+
+/* ── LOGIN ── */
+#login-screen{position:fixed;inset:0;background:var(--bg2);display:flex;align-items:center;justify-content:center;z-index:1000;}
+.login-box{background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius-lg);padding:36px 32px;width:340px;max-width:90vw;}
+.login-logo{font-size:22px;font-weight:600;color:var(--blue-600);letter-spacing:.04em;margin-bottom:4px;}
+.login-sub{font-size:12px;color:var(--text2);margin-bottom:28px;}
+.login-field{margin-bottom:14px;}
+.login-field label{font-size:12px;color:var(--text2);display:block;margin-bottom:5px;}
+.login-field input{width:100%;padding:9px 12px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);outline:none;transition:border-color .15s;}
+.login-field input:focus{border-color:var(--blue-400);}
+.login-err{font-size:12px;color:var(--red-600);margin-bottom:10px;display:none;}
+.login-btn{width:100%;padding:10px;background:var(--blue-600);color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:500;cursor:pointer;font-family:var(--font);transition:background .15s;margin-top:4px;}
+.login-btn:hover{background:var(--blue-800);}
+.login-hint{font-size:11px;color:var(--text3);margin-top:16px;text-align:center;}
+
+/* ── LAYOUT ── */
+#app{display:flex;height:100vh;min-height:600px;}
+#sidebar{width:196px;min-width:196px;background:var(--bg2);border-right:0.5px solid var(--border);display:flex;flex-direction:column;padding:0;}
+.sidebar-top{padding:18px 16px 14px;border-bottom:0.5px solid var(--border);}
+.brand{font-size:13px;font-weight:600;color:var(--blue-600);letter-spacing:.05em;}
+.sub-brand{font-size:11px;color:var(--text2);margin-top:2px;}
+.user-pill{display:flex;align-items:center;gap:6px;margin-top:10px;padding:6px 8px;background:var(--bg3);border-radius:20px;}
+.user-pill .avatar{width:20px;height:20px;border-radius:50%;background:var(--blue-600);color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;}
+.user-pill .uname{font-size:11px;font-weight:500;flex:1;}
+.user-pill .role-tag{font-size:9px;padding:2px 5px;border-radius:3px;font-weight:500;}
+.role-admin{background:var(--blue-50);color:var(--blue-800);}
+.role-user{background:var(--green-50);color:var(--green-600);}
+.sidebar-nav{padding:10px 8px;flex:1;overflow-y:auto;}
+.nav-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text2);transition:background .15s;margin-bottom:2px;}
+.nav-item:hover{background:var(--bg);}
+.nav-item.active{background:var(--blue-50);color:var(--blue-800);font-weight:500;}
+.nav-item.locked{opacity:.4;cursor:not-allowed;}
+.nav-section{font-size:10px;font-weight:500;color:var(--text3);letter-spacing:.08em;padding:10px 10px 4px;text-transform:uppercase;}
+.sidebar-bottom{padding:12px 16px;border-top:0.5px solid var(--border);}
+.logout-btn{width:100%;padding:6px;background:transparent;border:0.5px solid var(--border);border-radius:6px;font-size:12px;color:var(--text2);cursor:pointer;font-family:var(--font);transition:background .15s;}
+.logout-btn:hover{background:var(--bg3);}
+
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+#topbar{height:52px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--bg);flex-shrink:0;}
+.topbar-title{font-size:15px;font-weight:500;}
+.topbar-right{display:flex;align-items:center;gap:8px;}
+#content{flex:1;overflow-y:auto;padding:20px;}
+.page{display:none;}.page.active{display:block;}
+
+/* ── COMPONENTS ── */
+.badge{font-size:11px;padding:3px 8px;border-radius:4px;font-weight:500;white-space:nowrap;}
+.badge-blue{background:var(--blue-50);color:var(--blue-800);}
+.badge-green{background:var(--green-50);color:var(--green-600);}
+.badge-amber{background:var(--amber-50);color:var(--amber-600);}
+.badge-red{background:var(--red-50);color:var(--red-600);}
+.badge-purple{background:var(--purple-50);color:var(--purple-600);}
+.badge-teal{background:var(--teal-50);color:var(--teal-600);}
+
+.card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px;}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:6px;}
+.card-title{font-size:11px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;}
+
+.grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px;}
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px;}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px;}
+.metric-card{background:var(--bg2);border-radius:var(--radius);padding:14px 16px;}
+.metric-label{font-size:10px;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;}
+.metric-value{font-size:26px;font-weight:500;line-height:1;}
+.metric-sub{font-size:11px;color:var(--text2);margin-top:4px;}
+
+.oee-good{color:var(--green-600);}.fill-good{background:var(--green-400);}
+.oee-warn{color:var(--amber-600);}.fill-warn{background:var(--amber-400);}
+.oee-bad{color:var(--red-600);}.fill-bad{background:var(--red-400);}
+
+/* ── GAUGES ── */
+.dept-section{margin-bottom:12px;}
+.dept-label{font-size:10px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px;padding:3px 8px;border-radius:4px;display:inline-block;}
+.gauge-row{display:flex;gap:5px;flex-wrap:wrap;}
+.gauge-cell{min-width:70px;flex:1;background:var(--bg2);border-radius:7px;padding:7px;text-align:center;cursor:default;transition:box-shadow .15s;}
+.gauge-machine{font-size:9px;font-weight:500;color:var(--text2);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.gauge-pct{font-size:14px;font-weight:500;}
+.gauge-bar{height:3px;border-radius:2px;background:var(--border);margin-top:4px;overflow:hidden;}
+.gauge-fill{height:100%;border-radius:2px;transition:width .4s;}
+
+/* ── ENTRY FORM ── */
+.entry-controls{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.entry-controls label{font-size:13px;color:var(--text2);}
+input[type=date]{padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);outline:none;}
+.shift-toggle{display:flex;border:0.5px solid var(--border2);border-radius:var(--radius);overflow:hidden;}
+.shift-toggle button{padding:6px 14px;border:none;background:transparent;font-size:12px;cursor:pointer;font-family:var(--font);color:var(--text2);}
+.shift-toggle button.active{background:var(--blue-600);color:#fff;}
+.form-wrap{overflow-x:auto;border:0.5px solid var(--border);border-radius:var(--radius);}
+.form-table{width:100%;border-collapse:collapse;min-width:800px;}
+.form-table th{background:var(--bg2);padding:7px 10px;text-align:left;font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;border-bottom:0.5px solid var(--border);white-space:nowrap;}
+.form-table td{padding:3px 5px;border-bottom:0.5px solid var(--border);}
+.form-table tr:last-child td{border-bottom:none;}
+.td-label{padding:5px 10px;font-size:12px;font-weight:500;white-space:nowrap;background:var(--bg2);}
+.td-dept{padding:4px 8px;background:var(--bg2);}
+.td-in{background:var(--amber-50);}
+.td-in input{width:100%;border:none;background:transparent;font-size:12px;font-family:var(--font);color:var(--text);padding:4px 5px;outline:none;min-width:60px;}
+.td-in input:focus{background:var(--blue-50);border-radius:3px;}
+.td-calc{font-size:12px;font-weight:500;padding:5px 10px;color:var(--text2);white-space:nowrap;}
+.dept-sep td{padding:5px 10px;background:var(--bg3);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--text2);}
+
+/* ── BUTTONS ── */
+.btn{padding:7px 14px;border-radius:var(--radius);font-size:13px;cursor:pointer;border:0.5px solid var(--border2);background:var(--bg);color:var(--text);font-family:var(--font);transition:background .15s;}
+.btn:hover{background:var(--bg2);}
+.btn-primary{background:var(--blue-600);color:#fff;border-color:var(--blue-600);}
+.btn-primary:hover{background:var(--blue-800);}
+.btn-danger{background:var(--red-600);color:#fff;border-color:var(--red-600);}
+.btn-danger:hover{background:#7a1f1f;}
+.btn-sm{padding:5px 11px;font-size:12px;}
+
+/* ── HISTORY TABLE ── */
+table.hist{width:100%;border-collapse:collapse;font-size:12px;}
+table.hist th{background:var(--bg2);padding:7px 10px;text-align:left;font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;border-bottom:0.5px solid var(--border);white-space:nowrap;position:sticky;top:0;z-index:1;}
+table.hist td{padding:6px 10px;border-bottom:0.5px solid var(--border);white-space:nowrap;}
+table.hist tr:hover td{background:var(--bg2);}
+
+/* ── AI ── */
+#ai-messages{min-height:180px;max-height:320px;overflow-y:auto;margin-bottom:12px;}
+.ai-msg{margin-bottom:10px;}
+.ai-msg.user{text-align:right;}
+.ai-msg.user .bubble{background:var(--blue-50);color:var(--blue-900);border-radius:10px 10px 2px 10px;margin-left:auto;max-width:80%;display:inline-block;}
+.ai-msg.ai .bubble{background:var(--bg2);border-radius:2px 10px 10px 10px;max-width:92%;display:inline-block;}
+.bubble{padding:9px 12px;font-size:13px;line-height:1.55;}
+.ai-input-row{display:flex;gap:8px;}
+.ai-input-row input{flex:1;padding:8px 12px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);outline:none;}
+.ai-input-row input:focus{border-color:var(--blue-400);}
+.ai-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.chip{font-size:11px;padding:4px 10px;border:0.5px solid var(--border);border-radius:20px;cursor:pointer;background:var(--bg2);color:var(--text2);transition:background .15s;}
+.chip:hover{background:var(--blue-50);color:var(--blue-800);border-color:var(--blue-200);}
+
+/* ── SUMMARY BARS ── */
+.bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;justify-content:flex-end;}
+.bar{width:100%;border-radius:3px 3px 0 0;min-height:4px;}
+.bar-label{font-size:9px;color:var(--text2);text-align:center;overflow:hidden;white-space:nowrap;max-width:100%;}
+.bar-val{font-size:10px;font-weight:500;text-align:center;}
+
+/* ── SETTINGS ── */
+.settings-section{margin-bottom:24px;}
+.settings-title{font-size:13px;font-weight:500;margin-bottom:12px;padding-bottom:8px;border-bottom:0.5px solid var(--border);}
+.settings-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;}
+.settings-row label{font-size:12px;color:var(--text2);min-width:120px;}
+.settings-row input{flex:1;min-width:160px;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);outline:none;}
+.settings-row input:focus{border-color:var(--blue-400);}
+
+/* ── IMPORT ── */
+.import-zone{border:1.5px dashed var(--border2);border-radius:var(--radius-lg);padding:28px;text-align:center;color:var(--text2);font-size:13px;cursor:pointer;transition:background .15s;}
+.import-zone:hover{background:var(--bg2);}
+.import-zone input[type=file]{display:none;}
+#import-preview{margin-top:12px;font-size:12px;color:var(--text2);}
+
+/* ── MISC ── */
+.loading{color:var(--text2);font-size:13px;font-style:italic;}
+.dot-anim::after{content:'';animation:dots 1.2s steps(3,end) infinite;}
+@keyframes dots{0%{content:''}33%{content:'.'}66%{content:'..'}100%{content:'...'}}
+.save-ok{font-size:12px;color:var(--green-600);display:none;}
+select{padding:6px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;}
+@media(max-width:640px){.grid-4{grid-template-columns:repeat(2,1fr);}.grid-3{grid-template-columns:repeat(2,1fr);}#sidebar{width:160px;min-width:160px;}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">PEPS</div>
+    <div class="login-sub">OEE Monitor — Please sign in</div>
+    <div class="login-field"><label>Username</label><input type="text" id="l-user" placeholder="Enter username" autocomplete="off"></div>
+    <div class="login-field"><label>Password</label><input type="password" id="l-pass" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="login-err" id="l-err">Invalid username or password</div>
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-hint">Contact your administrator for access</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none;">
+  <div id="sidebar">
+    <div class="sidebar-top">
+      <div class="brand">PEPS</div>
+      <div class="sub-brand">OEE Monitor</div>
+      <div class="user-pill">
+        <div class="avatar" id="s-avatar">?</div>
+        <div class="uname" id="s-uname">—</div>
+        <span class="role-tag" id="s-role-tag">—</span>
+      </div>
+    </div>
+    <div class="sidebar-nav" id="sidebar-nav"></div>
+    <div class="sidebar-bottom">
+      <button class="logout-btn" onclick="doLogout()">Sign out</button>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="topbar">
+      <div class="topbar-title" id="page-title">Dashboard</div>
+      <div class="topbar-right">
+        <span class="badge badge-blue" id="top-date"></span>
+        <button class="btn btn-sm" onclick="exportCSV()" id="btn-export">↓ Export</button>
+      </div>
+    </div>
+    <div id="content">
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div class="grid-4">
+          <div class="metric-card"><div class="metric-label">Plant OEE</div><div class="metric-value" id="d-oee">—</div><div class="metric-sub">Latest entry avg</div></div>
+          <div class="metric-card"><div class="metric-label">Availability</div><div class="metric-value" id="d-avail">—</div></div>
+          <div class="metric-card"><div class="metric-label">Performance</div><div class="metric-value" id="d-perf">—</div></div>
+          <div class="metric-card"><div class="metric-label">Quality</div><div class="metric-value" id="d-qual">—</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Machine OEE — Latest Entry</span><span class="badge badge-blue" id="d-entry-date">No data</span></div>
+          <div id="gauge-container"></div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header"><span class="card-title">Day vs Night OEE</span></div>
+            <div id="shift-bars" style="display:flex;gap:24px;align-items:flex-end;height:80px;padding-top:8px;"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Top Loss Reasons</span></div>
+            <div id="loss-list" style="font-size:12px;color:var(--text2);">No data yet</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">OEE by Department</span></div>
+          <div id="dept-summary" style="display:flex;gap:12px;flex-wrap:wrap;"></div>
+        </div>
+      </div>
+
+      <!-- DATA ENTRY -->
+      <div class="page" id="page-entry">
+        <div class="entry-controls">
+          <label>Date</label>
+          <input type="date" id="entry-date">
+          <div class="shift-toggle">
+            <button class="active" id="btn-day" onclick="setShift('day')">Day</button>
+            <button id="btn-night" onclick="setShift('night')">Night</button>
+          </div>
+          <button class="btn btn-primary" onclick="saveEntry()">Save Entry →</button>
+          <span class="save-ok" id="save-msg">✓ Saved</span>
+        </div>
+        <div class="card" style="padding:0;">
+          <div class="form-wrap">
+            <table class="form-table">
+              <thead><tr>
+                <th>Machine</th><th>Dept</th>
+                <th>Runtime (hr)</th><th>Planned (hr)</th>
+                <th>Good Parts</th><th>Total Parts</th>
+                <th>Actual Rate</th><th>Ideal Rate</th>
+                <th>Loss Reason</th>
+                <th>Avail %</th><th>Perf %</th><th>Qual %</th><th>OEE %</th>
+              </tr></thead>
+              <tbody id="entry-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:6px;">Yellow cells are editable &nbsp;|&nbsp; OEE calculated automatically on save</div>
+      </div>
+
+      <!-- HISTORY -->
+      <div class="page" id="page-history">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span style="font-size:13px;color:var(--text2);" id="hist-count">0 entries</span>
+            <select id="hist-dept" onchange="renderHistory()">
+              <option value="">All Depts</option>
+              <option>STEEL</option><option>FABRIC</option><option>FOAM CUTTING</option><option>TAPE EDGE</option>
+            </select>
+            <select id="hist-shift" onchange="renderHistory()">
+              <option value="">All Shifts</option><option>day</option><option>night</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-sm" onclick="exportCSV()">↓ Export CSV</button>
+            <button class="btn btn-sm btn-danger" id="btn-clear-hist" onclick="clearHistory()" style="display:none;">✕ Clear All</button>
+          </div>
+        </div>
+        <div class="card" style="padding:0;overflow:auto;max-height:calc(100vh - 210px);">
+          <table class="hist">
+            <thead><tr><th>Date</th><th>Shift</th><th>Dept</th><th>Machine</th><th>Runtime</th><th>Avail%</th><th>Perf%</th><th>Qual%</th><th>OEE%</th><th>Loss Reason</th></tr></thead>
+            <tbody id="hist-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SUMMARY -->
+      <div class="page" id="page-summary">
+        <div class="grid-3" id="summary-cards"></div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">OEE Trend — Last 7 dates</span></div>
+          <div style="display:flex;align-items:flex-end;gap:4px;height:120px;" id="trend-chart"></div>
+          <div style="border-top:0.5px solid var(--border);margin-top:4px;"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Machine Performance Ranking</span></div>
+          <div id="machine-compare" style="display:flex;flex-direction:column;gap:6px;"></div>
+        </div>
+      </div>
+
+      <!-- AI -->
+      <div class="page" id="page-ai">
+        <div class="card">
+          <div class="card-header"><span class="card-title">AI Analysis</span><span class="badge badge-green">Powered by Claude</span></div>
+          <div class="ai-chips">
+            <div class="chip" onclick="askAI('Analyze overall OEE trends and identify key loss drivers across all departments')">📈 OEE trends</div>
+            <div class="chip" onclick="askAI('Which machines are underperforming across Steel, Fabric, Foam Cutting and Tape Edge?')">🔧 Machine insights</div>
+            <div class="chip" onclick="askAI('Compare day shift vs night shift OEE performance')">🌓 Shift comparison</div>
+            <div class="chip" onclick="askAI('Give me a department-level OEE breakdown')">🏭 Dept breakdown</div>
+            <div class="chip" onclick="askAI('What are the top 3 recommendations to improve plant OEE?')">💡 Recommendations</div>
+            <div class="chip" onclick="askAI('Which machines should be prioritized for maintenance based on the data?')">⚠️ Maintenance priority</div>
+          </div>
+          <div id="ai-messages">
+            <div class="ai-msg ai"><div class="bubble">Hello! I'm your PEPS OEE Analysis assistant. I can analyze production data across your 4 departments and 27 machines. Add data via Data Entry first, then ask me anything.</div></div>
+          </div>
+          <div class="ai-input-row">
+            <input type="text" id="ai-input" placeholder="Ask about your OEE data..." onkeydown="if(event.key==='Enter')sendAI()">
+            <button class="btn btn-primary" onclick="sendAI()">Ask →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- IMPORT -->
+      <div class="page" id="page-import">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Import History from CSV</span></div>
+          <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">Upload a previously exported PEPS OEE CSV file. Duplicate records (same date + shift + machine) will be skipped.</p>
+          <label class="import-zone" for="csv-upload">
+            <input type="file" id="csv-upload" accept=".csv" onchange="handleImport(this)">
+            <div style="font-size:28px;margin-bottom:8px;">↑</div>
+            <div style="font-weight:500;margin-bottom:4px;">Click to upload CSV</div>
+            <div style="font-size:12px;">Exported PEPS OEE format only</div>
+          </label>
+          <div id="import-preview"></div>
+        </div>
+      </div>
+
+      <!-- SETTINGS (Admin only) -->
+      <div class="page" id="page-settings">
+        <div class="card">
+          <div class="settings-section">
+            <div class="settings-title">Change Passwords</div>
+            <div class="settings-row"><label>Admin password</label><input type="password" id="set-admin-pw" placeholder="New admin password"><button class="btn btn-sm btn-primary" onclick="changePw('admin')">Update</button></div>
+            <div class="settings-row"><label>User password</label><input type="password" id="set-user-pw" placeholder="New user password"><button class="btn btn-sm btn-primary" onclick="changePw('user')">Update</button></div>
+            <span class="save-ok" id="pw-ok">✓ Password updated</span>
+          </div>
+          <div class="settings-section">
+            <div class="settings-title">Data Management</div>
+            <div class="settings-row">
+              <label>Total records</label>
+              <span id="set-total" style="font-size:13px;font-weight:500;">0</span>
+            </div>
+            <div class="settings-row">
+              <label>Export all data</label>
+              <button class="btn btn-sm" onclick="exportCSV()">↓ Export CSV</button>
+            </div>
+            <div class="settings-row">
+              <label>Clear all history</label>
+              <button class="btn btn-sm btn-danger" onclick="clearHistory()">✕ Clear All Records</button>
+            </div>
+          </div>
+          <div class="settings-section">
+            <div class="settings-title">About</div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.7;">
+              PEPS OEE Monitor v3.0<br>
+              27 machines · 4 departments<br>
+              Steel · Fabric · Foam Cutting · Tape Edge
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ── MACHINE DATA ──
+const MACHINES=[
+  {id:'M01',name:'FT-81-1',    dept:'STEEL',       model:'FT-81'},
+  {id:'M02',name:'FT-81-2',    dept:'STEEL',       model:'FT-81'},
+  {id:'M03',name:'FT-81-3',    dept:'STEEL',       model:'FT-81'},
+  {id:'M04',name:'FT-81-4',    dept:'STEEL',       model:'FT-81'},
+  {id:'M05',name:'MDC-80',       dept:'STEEL',       model:'MDC-80'},
+  {id:'M06',name:'FA-20',      dept:'STEEL',       model:'FA-20'},
+  {id:'M07',name:'LR-PS-UVS',   dept:'STEEL',       model:'LR-PS-UVS'},
+  {id:'M08',name:'LR-PS-VS',   dept:'STEEL',       model:'LR-PS-VS'},
+  {id:'M09',name:'LR-PS-OV',   dept:'STEEL',       model:'LR-PS-OV'},
+  {id:'M10',name:'LR-PS-98',dept:'STEEL',       model:'LR-PS-98'},
+  {id:'M11',name:'PARAGON+',           dept:'FABRIC',      model:'Paragon M4+'},
+  {id:'M12',name:'RELIANCE',           dept:'FABRIC',      model:'Reliance M4+'},
+  {id:'M13',name:'EVEREN',           dept:'FABRIC',      model:'HC-3200'},
+  {id:'M14',name:'SINGER',       dept:'FABRIC',      model:'Singer'},
+  {id:'M15',name:'LEON-VRS',        dept:'FABRIC',      model:'Leon-VRS'},
+  {id:'M16',name:'SUNKIST',     dept:'FOAM CUTTING',model:'Sunkist'},
+  {id:'M17',name:'WBX-300',      dept:'FOAM CUTTING',model:'WBX-300'},
+  {id:'M18',name:'TAPE EDGE-1',          dept:'TAPE EDGE',   model:'WB-5A'},
+  {id:'M19',name:'TAPE EDGE-2',          dept:'TAPE EDGE',   model:'WB-5A'},
+  {id:'M20',name:'TAPE EDGE-3',          dept:'TAPE EDGE',   model:'WB-4'},
+  {id:'M21',name:'TAPE EDGE-4',          dept:'TAPE EDGE',   model:'WB-4'},
+  {id:'M22',name:'TAPE EDGE-5',          dept:'TAPE EDGE',   model:'WB-4'},
+  {id:'M23',name:'TAPE EDGE-6',          dept:'TAPE EDGE',   model:'WB-4'},
+  {id:'M24',name:'TAPE EDGE-7',          dept:'TAPE EDGE',   model:'WB-4'},
+  {id:'M25',name:'TAPE EDGE-8',          dept:'TAPE EDGE',   model:'WB-4'},
+  {id:'M26',name:'TAPE EDGE-9',          dept:'TAPE EDGE',   model:'WB-4'},
+  {id:'M27',name:'TAPE EDGE-10',         dept:'TAPE EDGE',   model:'WB-4'},
+];
+const DEPTS=['STEEL','FABRIC','FOAM CUTTING','TAPE EDGE'];
+const DEPT_BADGE={'STEEL':'badge-blue','FABRIC':'badge-green','FOAM CUTTING':'badge-amber','TAPE EDGE':'badge-purple'};
+const DEPT_SHORT={'STEEL':'STEEL','FABRIC':'FABRIC','FOAM CUTTING':'FOAM','TAPE EDGE':'TAPE'};
+
+// ── STATE ──
+let oeeData=[], currentShift='day', currentRole=null, currentUser=null, aiHistory=[];
+let credentials={admin:{user:'admin',pass:'admin123'},operator:{user:'operator',pass:'peps2024'}};
+
+// ── STORAGE ──
+async function save(key,val){
+  try{await window.storage.set(key,JSON.stringify(val));}
+  catch(e){try{localStorage.setItem(key,JSON.stringify(val));}catch(e2){}}
+}
+async function load(key){
+  try{const r=await window.storage.get(key);return r?JSON.parse(r.value):null;}
+  catch(e){try{const s=localStorage.getItem(key);return s?JSON.parse(s):null;}catch(e2){return null;}}
+}
+
+(async()=>{
+  const d=await load('peps-oee-v3');if(d)oeeData=d;
+  const c=await load('peps-creds');if(c)credentials=c;
+  document.getElementById('top-date').textContent=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  document.getElementById('entry-date').value=new Date().toISOString().split('T')[0];
+})();
+
+// ── AUTH ──
+function doLogin(){
+  const u=document.getElementById('l-user').value.trim();
+  const p=document.getElementById('l-pass').value;
+  const err=document.getElementById('l-err');
+  if(u===credentials.admin.user&&p===credentials.admin.pass){startSession('admin',u);}
+  else if(u===credentials.operator.user&&p===credentials.operator.pass){startSession('user',u);}
+  else{err.style.display='block';setTimeout(()=>err.style.display='none',3000);}
+}
+
+function startSession(role,user){
+  currentRole=role;currentUser=user;
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('s-uname').textContent=user;
+  document.getElementById('s-avatar').textContent=user[0].toUpperCase();
+  const tag=document.getElementById('s-role-tag');
+  tag.textContent=role==='admin'?'Admin':'User';
+  tag.className='role-tag '+(role==='admin'?'role-admin':'role-user');
+  buildNav(role);
+  buildEntryTable();
+  renderDashboard();
+  if(role==='admin'){
+    document.getElementById('btn-clear-hist').style.display='inline-flex';
+    document.getElementById('set-total').textContent=oeeData.length;
+  }
+  if(role==='user'){
+    document.getElementById('btn-export').style.display='none';
+    showPage('entry');
+  }
+}
+
+function doLogout(){
+  currentRole=null;currentUser=null;
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('l-user').value='';document.getElementById('l-pass').value='';
+  aiHistory=[];
+}
+
+// ── NAV ──
+const NAV_ADMIN=[
+  {id:'dashboard',icon:'▦',label:'Dashboard',section:'Main'},
+  {id:'entry',icon:'✎',label:'Data Entry',section:null},
+  {id:'history',icon:'☰',label:'History Log',section:'Reports'},
+  {id:'summary',icon:'◈',label:'Summary',section:null},
+  {id:'ai',icon:'◎',label:'AI Analysis',section:'Intelligence'},
+  {id:'import',icon:'↑',label:'Import CSV',section:'Data'},
+  {id:'settings',icon:'⚙',label:'Settings',section:null},
+];
+const NAV_USER=[
+  {id:'entry',icon:'✎',label:'Data Entry',section:''},
+];
+
+function buildNav(role){
+  const nav=document.getElementById('sidebar-nav');
+  const items=role==='admin'?NAV_ADMIN:NAV_USER;
+  let html='';
+  items.forEach(item=>{
+    if(item.section!==null)html+=`<div class="nav-section">${item.section}</div>`;
+    html+=`<div class="nav-item${item.id==='entry'?' active':''}" id="nav-${item.id}" onclick="showPage('${item.id}')"><span>${item.icon}</span> ${item.label}</div>`;
+  });
+  nav.innerHTML=html;
+}
+
+function showPage(p){
+  document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
+  const pg=document.getElementById('page-'+p);
+  if(pg)pg.classList.add('active');
+  const ni=document.getElementById('nav-'+p);
+  if(ni)ni.classList.add('active');
+  const titles={dashboard:'Dashboard',entry:'Data Entry',history:'History Log',summary:'Summary',ai:'AI Analysis',import:'Import CSV',settings:'Settings'};
+  document.getElementById('page-title').textContent=titles[p]||p;
+  if(p==='history')renderHistory();
+  if(p==='summary')renderSummary();
+  if(p==='dashboard')renderDashboard();
+  if(p==='settings')document.getElementById('set-total').textContent=oeeData.length;
+}
+
+// ── DATA ENTRY ──
+function setShift(s){
+  currentShift=s;
+  document.getElementById('btn-day').classList.toggle('active',s==='day');
+  document.getElementById('btn-night').classList.toggle('active',s==='night');
+}
+
+function buildEntryTable(){
+  let last='',html='';
+  MACHINES.forEach(m=>{
+    if(m.dept!==last){html+=`<tr class="dept-sep"><td colspan="13">${m.dept}</td></tr>`;last=m.dept;}
+    html+=`<tr>
+      <td class="td-label">${m.name}</td>
+      <td class="td-dept"><span class="badge ${DEPT_BADGE[m.dept]}" style="font-size:9px">${DEPT_SHORT[m.dept]}</span></td>
+      <td class="td-in"><input type="number" min="0" step="0.01" id="r-${m.id}-0" placeholder="0"></td>
+      <td class="td-in"><input type="number" min="0" step="0.01" id="r-${m.id}-1" placeholder="0"></td>
+      <td class="td-in"><input type="number" min="0" id="r-${m.id}-2" placeholder="0"></td>
+      <td class="td-in"><input type="number" min="0" id="r-${m.id}-3" placeholder="0"></td>
+      <td class="td-in"><input type="number" min="0" step="0.01" id="r-${m.id}-4" placeholder="0"></td>
+      <td class="td-in"><input type="number" min="0" step="0.01" id="r-${m.id}-5" placeholder="0"></td>
+      <td class="td-in"><input type="text" id="r-${m.id}-6" placeholder="—"></td>
+      <td class="td-calc" id="c-${m.id}-a">—</td>
+      <td class="td-calc" id="c-${m.id}-p">—</td>
+      <td class="td-calc" id="c-${m.id}-q">—</td>
+      <td class="td-calc" id="c-${m.id}-o">—</td>
+    </tr>`;
+  });
+  document.getElementById('entry-body').innerHTML=html;
+  MACHINES.forEach(m=>{for(let i=0;i<6;i++){const el=document.getElementById(`r-${m.id}-${i}`);if(el)el.addEventListener('input',()=>liveCalc(m.id));}});
+}
+
+function liveCalc(mid){
+  const v=i=>parseFloat(document.getElementById(`r-${mid}-${i}`)?.value)||0;
+  const c=calcOEE(v(0),v(1),v(2),v(3),v(4),v(5));
+  const set=(id,val,raw)=>{const el=document.getElementById(id);if(el){el.textContent=val;el.className='td-calc'+(raw>0?' oee-'+oeeColor(raw):'');}};
+  set(`c-${mid}-a`,c.avail>0?c.avail.toFixed(1)+'%':'—',c.avail);
+  set(`c-${mid}-p`,c.perf>0?c.perf.toFixed(1)+'%':'—',c.perf);
+  set(`c-${mid}-q`,c.qual>0?c.qual.toFixed(1)+'%':'—',c.qual);
+  set(`c-${mid}-o`,c.oee>0?c.oee.toFixed(1)+'%':'—',c.oee);
+}
+
+function calcOEE(rt,pl,gp,tp,ar,ir){
+  const a=pl>0?Math.min(100,(rt/pl)*100):0;
+  const p=ir>0?Math.min(100,(ar/ir)*100):0;
+  const q=tp>0?Math.min(100,(gp/tp)*100):0;
+  return{avail:Math.round(a*10)/10,perf:Math.round(p*10)/10,qual:Math.round(q*10)/10,oee:Math.round((a/100)*(p/100)*(q/100)*100*10)/10};
+}
+
+function saveEntry(){
+  const date=document.getElementById('entry-date').value;
+  if(!date){alert('Select a date');return;}
+  let saved=0;
+  MACHINES.forEach(m=>{
+    const g=i=>parseFloat(document.getElementById(`r-${m.id}-${i}`)?.value)||0;
+    const rt=g(0),pl=g(1),gp=g(2),tp=g(3),ar=g(4),ir=g(5),loss=document.getElementById(`r-${m.id}-6`)?.value||'';
+    if(pl===0&&rt===0&&gp===0)return;
+    const c=calcOEE(rt,pl,gp,tp,ar,ir);
+    oeeData.push({date,shift:currentShift,machineId:m.id,machine:m.name,dept:m.dept,model:m.model,runtime:rt,planned:pl,good:gp,total:tp,actual:ar,ideal:ir,loss,...c});
+    saved++;
+  });
+  if(!saved){alert('Enter data for at least one machine');return;}
+  save('peps-oee-v3',oeeData);
+  renderDashboard();
+  const msg=document.getElementById('save-msg');msg.style.display='inline';setTimeout(()=>msg.style.display='none',2500);
+}
+
+// ── DASHBOARD ──
+function oeeColor(v){return v>=75?'good':v>=50?'warn':'bad';}
+function avg(a){return a.length?a.reduce((x,y)=>x+y,0)/a.length:0;}
+function fmtDate(d){return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}
+function getLatest(){if(!oeeData.length)return[];const d=[...new Set(oeeData.map(r=>r.date))].sort().reverse();return oeeData.filter(r=>r.date===d[0]);}
+
+function renderDashboard(){
+  const latest=getLatest();
+  if(!latest.length){
+    ['d-oee','d-avail','d-perf','d-qual'].forEach(id=>document.getElementById(id).textContent='—');
+    document.getElementById('gauge-container').innerHTML='<div style="color:var(--text2);font-size:13px;padding:8px">No data yet — use Data Entry to add records</div>';
+    document.getElementById('dept-summary').innerHTML='';
+    return;
+  }
+  const s=(id,v,cls)=>{const el=document.getElementById(id);if(!el)return;el.textContent=v.toFixed(1)+'%';if(cls)el.className='metric-value oee-'+oeeColor(v);};
+  s('d-oee',avg(latest.map(r=>r.oee)),true);s('d-avail',avg(latest.map(r=>r.avail)));s('d-perf',avg(latest.map(r=>r.perf)));s('d-qual',avg(latest.map(r=>r.qual)));
+  document.getElementById('d-entry-date').textContent=fmtDate(latest[0].date);
+  const byM={};latest.forEach(r=>{if(!byM[r.machineId])byM[r.machineId]=[];byM[r.machineId].push(r);});
+  let gh='';
+  DEPTS.forEach(dept=>{
+    gh+=`<div class="dept-section"><div class="dept-label ${DEPT_BADGE[dept]}">${dept}</div><div class="gauge-row">`;
+    MACHINES.filter(m=>m.dept===dept).forEach(m=>{
+      const rows=byM[m.id]||[],v=rows.length?avg(rows.map(r=>r.oee)):null,c=v!==null?oeeColor(v):'';
+      const nm=m.name.length>13?m.name.substring(0,12)+'…':m.name;
+      gh+=`<div class="gauge-cell" title="${m.name}${v!==null?' — '+v.toFixed(1)+'%':': no data'}">
+        <div class="gauge-machine">${nm}</div>
+        <div class="gauge-pct ${v!==null?'oee-'+c:''}">${v!==null?v.toFixed(0)+'%':'—'}</div>
+        <div class="gauge-bar"><div class="gauge-fill fill-${v!==null?c:'good'}" style="width:${v||0}%"></div></div>
+      </div>`;
+    });
+    gh+='</div></div>';
+  });
+  document.getElementById('gauge-container').innerHTML=gh;
+  const dOEE=avg(oeeData.filter(r=>r.shift==='day').map(r=>r.oee));
+  const nOEE=avg(oeeData.filter(r=>r.shift==='night').map(r=>r.oee));
+  document.getElementById('shift-bars').innerHTML=`
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;">
+      <div style="font-size:14px;font-weight:500;color:var(--blue-600)">${dOEE.toFixed(1)}%</div>
+      <div style="width:40px;background:var(--blue-400);border-radius:3px 3px 0 0;height:${Math.round((dOEE/100)*56)}px;"></div>
+      <div style="font-size:11px;color:var(--text2)">Day</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;">
+      <div style="font-size:14px;font-weight:500;color:var(--teal-600)">${nOEE.toFixed(1)}%</div>
+      <div style="width:40px;background:var(--teal-400);border-radius:3px 3px 0 0;height:${Math.round((nOEE/100)*56)}px;"></div>
+      <div style="font-size:11px;color:var(--text2)">Night</div>
+    </div>`;
+  const lc={};oeeData.forEach(r=>{if(r.loss&&r.loss.trim()&&r.loss!=='—')lc[r.loss]=(lc[r.loss]||0)+1;});
+  const top=Object.entries(lc).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  document.getElementById('loss-list').innerHTML=top.length?top.map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:0.5px solid var(--border)"><span>${k}</span><span class="badge badge-amber">${v}x</span></div>`).join(''):'<div style="color:var(--text2);font-size:13px;">None recorded</div>';
+  const ds={};latest.forEach(r=>{if(!ds[r.dept])ds[r.dept]=[];ds[r.dept].push(r.oee);});
+  document.getElementById('dept-summary').innerHTML=DEPTS.filter(d=>ds[d]).map(d=>{const v=avg(ds[d]);return`<div class="metric-card" style="flex:1;min-width:110px;"><div class="metric-label">${d}</div><div class="metric-value oee-${oeeColor(v)}">${v.toFixed(1)}%</div><div class="metric-sub">${ds[d].length} machines</div></div>`;}).join('');
+}
+
+// ── HISTORY ──
+function renderHistory(){
+  const dF=document.getElementById('hist-dept').value;
+  const sF=document.getElementById('hist-shift').value;
+  const sorted=[...oeeData].filter(r=>(!dF||r.dept===dF)&&(!sF||r.shift===sF)).sort((a,b)=>b.date.localeCompare(a.date)||a.machine.localeCompare(b.machine));
+  document.getElementById('hist-count').textContent=`${sorted.length} entries`;
+  const body=document.getElementById('hist-body');
+  if(!sorted.length){body.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--text2);padding:24px">No data</td></tr>';return;}
+  body.innerHTML=sorted.map(r=>{const c=oeeColor(r.oee);return`<tr><td>${fmtDate(r.date)}</td><td><span class="badge ${r.shift==='day'?'badge-blue':'badge-amber'}">${r.shift}</span></td><td><span class="badge ${DEPT_BADGE[r.dept]}" style="font-size:9px">${r.dept}</span></td><td style="font-weight:500">${r.machine}</td><td>${r.runtime}h</td><td>${r.avail.toFixed(1)}%</td><td>${r.perf.toFixed(1)}%</td><td>${r.qual.toFixed(1)}%</td><td><span class="badge badge-${c==='good'?'green':c==='warn'?'amber':'red'}">${r.oee.toFixed(1)}%</span></td><td style="color:var(--text2)">${r.loss||'—'}</td></tr>`;}).join('');
+}
+
+function clearHistory(){
+  if(!confirm('Clear ALL OEE records? This cannot be undone.'))return;
+  oeeData=[];save('peps-oee-v3',oeeData);
+  renderDashboard();renderHistory();
+  document.getElementById('set-total').textContent=0;
+}
+
+// ── SUMMARY ──
+function renderSummary(){
+  const total=oeeData.length,avgAll=avg(oeeData.map(r=>r.oee)),dates=[...new Set(oeeData.map(r=>r.date))];
+  document.getElementById('summary-cards').innerHTML=`<div class="metric-card"><div class="metric-label">Total Records</div><div class="metric-value">${total}</div></div><div class="metric-card"><div class="metric-label">Overall OEE</div><div class="metric-value oee-${oeeColor(avgAll)}">${avgAll.toFixed(1)}%</div></div><div class="metric-card"><div class="metric-label">Days Recorded</div><div class="metric-value">${dates.length}</div></div>`;
+  const byDate={};oeeData.forEach(r=>{if(!byDate[r.date])byDate[r.date]=[];byDate[r.date].push(r.oee);});
+  const tDates=Object.keys(byDate).sort().slice(-7);
+  document.getElementById('trend-chart').innerHTML=tDates.length?tDates.map(d=>{const v=avg(byDate[d]),h=Math.round((v/100)*100);return`<div class="bar-wrap"><div class="bar-val oee-${oeeColor(v)}">${v.toFixed(0)}%</div><div class="bar fill-${oeeColor(v)}" style="height:${h}px"></div><div class="bar-label">${fmtDate(d).split(' ').slice(0,2).join(' ')}</div></div>`;}).join(''):'<div style="color:var(--text2);font-size:13px;">No data</div>';
+  const byM={};oeeData.forEach(r=>{if(!byM[r.machineId])byM[r.machineId]={name:r.machine,dept:r.dept,vals:[]};byM[r.machineId].vals.push(r.oee);});
+  const mc=Object.values(byM).map(x=>({...x,v:avg(x.vals)})).sort((a,b)=>b.v-a.v);
+  const mx=Math.max(...mc.map(x=>x.v),1);
+  document.getElementById('machine-compare').innerHTML=mc.map(({name,dept,v})=>`<div style="display:flex;align-items:center;gap:8px;font-size:12px;"><div style="width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${name}</div><span class="badge ${DEPT_BADGE[dept]}" style="width:44px;text-align:center;font-size:9px;">${DEPT_SHORT[dept]}</span><div style="flex:1;background:var(--bg2);border-radius:2px;height:12px;overflow:hidden;"><div class="gauge-fill fill-${oeeColor(v)}" style="width:${Math.round((v/mx)*100)}%;height:100%"></div></div><div style="width:40px;font-weight:500;text-align:right">${v.toFixed(1)}%</div></div>`).join('')||'<div style="color:var(--text2)">No data yet</div>';
+}
+
+// ── EXPORT ──
+function exportCSV(){
+  const h=['Date','Shift','Dept','Machine','Model','Runtime','Planned','Good Parts','Total Parts','Actual Rate','Ideal Rate','Loss Reason','Availability%','Performance%','Quality%','OEE%'];
+  const rows=oeeData.map(r=>[r.date,r.shift,r.dept,r.machine,r.model,r.runtime,r.planned,r.good,r.total,r.actual,r.ideal,r.loss||'',r.avail,r.perf,r.qual,r.oee]);
+  const csv=[h,...rows].map(row=>row.map(v=>typeof v==='string'&&v.includes(',')?`"${v}"`:v).join(',')).join('\n');
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='PEPS_OEE_Export_'+new Date().toISOString().split('T')[0]+'.csv';a.click();
+}
+
+// ── IMPORT ──
+function handleImport(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const lines=e.target.result.split('\n').filter(l=>l.trim());
+    if(lines.length<2){showImportResult('File appears empty or invalid.',false);return;}
+    const headers=lines[0].split(',').map(h=>h.trim().toLowerCase().replace('%',''));
+    let imported=0,skipped=0;
+    const existing=new Set(oeeData.map(r=>`${r.date}|${r.shift}|${r.machine}`));
+    for(let i=1;i<lines.length;i++){
+      const vals=parseCsvLine(lines[i]);
+      if(vals.length<16)continue;
+      const rec={
+        date:vals[0]?.trim(),shift:vals[1]?.trim(),dept:vals[2]?.trim(),machine:vals[3]?.trim(),model:vals[4]?.trim(),
+        machineId:MACHINES.find(m=>m.name===vals[3]?.trim())?.id||'M??',
+        runtime:parseFloat(vals[5])||0,planned:parseFloat(vals[6])||0,
+        good:parseFloat(vals[7])||0,total:parseFloat(vals[8])||0,
+        actual:parseFloat(vals[9])||0,ideal:parseFloat(vals[10])||0,
+        loss:vals[11]?.trim()||'',
+        avail:parseFloat(vals[12])||0,perf:parseFloat(vals[13])||0,qual:parseFloat(vals[14])||0,oee:parseFloat(vals[15])||0
+      };
+      if(!rec.date||!rec.machine)continue;
+      const key=`${rec.date}|${rec.shift}|${rec.machine}`;
+      if(existing.has(key)){skipped++;continue;}
+      oeeData.push(rec);existing.add(key);imported++;
+    }
+    save('peps-oee-v3',oeeData);
+    renderDashboard();
+    showImportResult(`✓ Imported ${imported} records. ${skipped} duplicates skipped.`,true);
+  };
+  reader.readAsText(file);
+  input.value='';
+}
+
+function parseCsvLine(line){
+  const result=[];let cur='',inQ=false;
+  for(let i=0;i<line.length;i++){
+    if(line[i]==='"'){inQ=!inQ;}
+    else if(line[i]===','&&!inQ){result.push(cur);cur='';}
+    else cur+=line[i];
+  }
+  result.push(cur);return result;
+}
+
+function showImportResult(msg,ok){
+  const el=document.getElementById('import-preview');
+  el.innerHTML=`<div style="margin-top:12px;padding:10px 14px;border-radius:var(--radius);background:${ok?'var(--green-50)':'var(--red-50)'};color:${ok?'var(--green-600)':'var(--red-600)'};font-size:13px;">${msg}</div>`;
+}
+
+// ── SETTINGS ──
+function changePw(role){
+  const field=document.getElementById(`set-${role}-pw`);
+  const val=field.value.trim();
+  if(!val){alert('Enter a new password');return;}
+  credentials[role==='admin'?'admin':'operator'].pass=val;
+  save('peps-creds',credentials);
+  field.value='';
+  const ok=document.getElementById('pw-ok');ok.style.display='inline';setTimeout(()=>ok.style.display='none',2500);
+}
+
+// ── AI ──
+async function askAI(q){document.getElementById('ai-input').value=q;await sendAI();}
+async function sendAI(){
+  const input=document.getElementById('ai-input'),q=input.value.trim();if(!q)return;
+  input.value='';addMsg('user',q);
+  const lid=addMsg('ai','<span class="loading dot-anim">Analyzing</span>');
+  const byD={},byM={},byS={day:[],night:[]};
+  oeeData.forEach(r=>{if(!byD[r.dept])byD[r.dept]=[];byD[r.dept].push(r.oee);if(!byM[r.machine])byM[r.machine]=[];byM[r.machine].push(r.oee);byS[r.shift].push(r.oee);});
+  const lc={};oeeData.forEach(r=>{if(r.loss&&r.loss.trim()&&r.loss!=='—')lc[r.loss]=(lc[r.loss]||0)+1;});
+  const summary=oeeData.length
+    ?`Records:${oeeData.length}|Dates:${[...new Set(oeeData.map(r=>r.date))].sort().join(',')}|OverallOEE:${avg(oeeData.map(r=>r.oee)).toFixed(1)}%|DayOEE:${avg(byS.day).toFixed(1)}%(${byS.day.length}records)|NightOEE:${avg(byS.night).toFixed(1)}%(${byS.night.length}records)|ByDept:${Object.entries(byD).map(([d,v])=>`${d}:${avg(v).toFixed(1)}%`).join('|')}|ByMachine:${Object.entries(byM).map(([m,v])=>`${m}:${avg(v).toFixed(1)}%`).join(',')}|TopLoss:${Object.entries(lc).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v])=>`${k}(${v}x)`).join(',')}`
+    :'No data entered yet.';
+  const sys=`You are an OEE expert for PEPS, a mattress manufacturer. Depts: STEEL(10 machines-FT-81-1/2/3/4,MDC-80,FA-20,LR-PS-UVS/VS/OV,LR-PS-98), FABRIC(5-PARAGON+,RELIANCE,EVEREN,SINGER,LEON-VRS), FOAM CUTTING(2-SUNKIST,WBX-300), TAPE EDGE(10-TAPE EDGE-1 to TAPE EDGE-10). OEE=Availability×Performance×Quality. Benchmarks:≥85% world-class,≥75% good,50-75% improvement needed,<50% poor. Data:${summary}. Be concise and actionable. Plain text only.`;
+  aiHistory.push({role:'user',content:q});
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:sys,messages:aiHistory.slice(-10)})});
+    const data=await resp.json();
+    const text=data.content?.find(c=>c.type==='text')?.text||'Unable to analyze. Please try again.';
+    updateMsg(lid,text);aiHistory.push({role:'assistant',content:text});
+  }catch(e){updateMsg(lid,'Connection error. Please try again.');aiHistory.pop();}
+}
+
+let mc=0;
+function addMsg(role,html){const id='m'+(++mc);const d=document.createElement('div');d.className='ai-msg '+role;d.id=id;d.innerHTML=`<div class="bubble">${html}</div>`;document.getElementById('ai-messages').appendChild(d);d.scrollIntoView({behavior:'smooth',block:'nearest'});return id;}
+function updateMsg(id,text){const el=document.getElementById(id);if(el)el.querySelector('.bubble').textContent=text;}
+</script>
+</body>
+</html>
